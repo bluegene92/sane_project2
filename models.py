@@ -6,7 +6,6 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.preprocessing import image
 
-
 #files
 faceDetectionModelFile = "haarcascade_frontalface_default.xml"
 emotionPredictionModelFile = "fer2013_mini_XCEPTION.102-0.66.hdf5"
@@ -22,6 +21,8 @@ BLUE = (255, 0, 0)
 RED = (0, 0, 255)
 BORDER_WIDTH = 2
 FRAMES_MAX = 120
+FONT_SCALE = 0.5
+yOffset = 20
 emotionLabels = {
     0: 'angry',
     1: 'digust',
@@ -77,7 +78,7 @@ class VideoThread(QThread):
 
                 #turn image to gray scale
                 grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                faces = face_model.detectMultiScale(grayImage, 1.1, 4)
+                faces = face_model.detectMultiScale(grayImage, 1.3, 4)
                 for (x, y, w, h) in faces:
 
                     #draw rectangle around face
@@ -98,15 +99,15 @@ class VideoThread(QThread):
                     moodText = "{} ({})".format(emotionLabels[moodIndex], probability)
 
                     #write emotion prediction on screen
-                    cv2.putText(frame, moodText, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, RED)
+                    cv2.putText(frame, moodText, (x, (y+h+yOffset)), cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE, RED)
 
                     #when frame count get to 120 calculate the fps and reset time
-                    frameCount = frameCount + 1
+                    frameCount += 1
                     if (frameCount >= self.frame_nums):
                         end = time.time()
                         seconds = end - start
                         fps = self.frame_nums / seconds
-                        fps = int(round(fps))
+                        fps = round(fps)
                         self.window.fps.setText("FPS: {}".format(fps))
                         print("fps: {}".format(fps))
                         frameCount = 0 #reset frame count

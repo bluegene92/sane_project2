@@ -6,23 +6,26 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 from PyQt5 import QtGui, uic, QtWidgets
 from models import VideoThread, Camera
 
+CAMERA_WIDTH = 420
+CAMERA_HEIGHT = 300
+CAMERA_ID = 0
+SCREEN_RATIO = CAMERA_HEIGHT/CAMERA_WIDTH
+
+#calculate from frame.shape width multiply by 3
+BYTES_PER_LINE = 1272
+
 def update(frame):
     height, width, channel = frame.shape
-    bytesPerLine = 3 * width
-    qImg = QtGui.QImage(frame.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888)
+    qImg = QtGui.QImage(frame.data, width, height, BYTES_PER_LINE, QtGui.QImage.Format_RGB888)
     qImg = qImg.rgbSwapped()
     coloredFrame = QtGui.QPixmap(qImg)
 
-    ratio = cameraHeight/cameraWidth
     scaleX = window.width() / width
     newWidth = width * scaleX
-    newHeight = (cameraHeight/cameraWidth) * newWidth
+    newHeight = (SCREEN_RATIO) * newWidth
     scaledFrame = coloredFrame.scaled(newWidth, newHeight, Qt.KeepAspectRatio)
+    window.videoOutput.setFixedHeight(newHeight)
     window.videoOutput.setPixmap(scaledFrame)
-    window.videoOutput.resize(newWidth, newHeight)
-    window.videoOutput.setMinimumSize(cameraWidth,cameraHeight)
-
-
 
 def quitApp():
     print('quit app')
@@ -34,14 +37,12 @@ def quitApp():
 app = QtWidgets.QApplication([])
 window = uic.loadUi("main.ui")
 window.layout.setContentsMargins(0,0,0,0)
+window.setWindowTitle("Project 2")
 window.setLayout(window.layout)
 window.show()
 
 #webcam
-cameraNumber = 0
-cameraWidth = 420
-cameraHeight = 300
-camera = Camera(cameraNumber, cameraWidth, cameraHeight)
+camera = Camera(CAMERA_ID, CAMERA_WIDTH, CAMERA_HEIGHT)
 
 #thread
 videoThread = VideoThread(camera, window)
