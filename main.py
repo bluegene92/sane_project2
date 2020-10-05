@@ -14,7 +14,6 @@ def update(frame):
     coloredFrame = QtGui.QPixmap(qImg)
 
     ratio = cameraHeight/cameraWidth
-    print("ratio: {}".format(ratio))
     scaleX = window.width() / width
     newWidth = width * scaleX
     newHeight = (cameraHeight/cameraWidth) * newWidth
