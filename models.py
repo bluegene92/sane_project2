@@ -71,6 +71,10 @@ class VideoThread(QThread):
             else:
                 ret, frame = self.camera.frame
 
+                #flip the frame horizontally
+                if (self.isMirror):
+                    frame = cv2.flip(frame, HORIZONTAL)
+
                 #turn image to gray scale
                 grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = face_model.detectMultiScale(grayImage, 1.1, 4)
@@ -89,10 +93,12 @@ class VideoThread(QThread):
                     #mood prediction
                     predictions = model.predict(imgPixels)
                     moodIndex = numpy.argmax(predictions)
-                    moodText = emotionLabels[moodIndex]
+                    probability = numpy.max(predictions)
+                    probability = str(round(probability, 2))
+                    moodText = "{} ({})".format(emotionLabels[moodIndex], probability)
 
                     #write emotion prediction on screen
-                    cv2.putText(frame, moodText, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, RED, 2)
+                    cv2.putText(frame, moodText, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, RED)
 
                     #when frame count get to 120 calculate the fps and reset time
                     frameCount = frameCount + 1
@@ -105,10 +111,6 @@ class VideoThread(QThread):
                         print("fps: {}".format(fps))
                         frameCount = 0 #reset frame count
                         start = time.time() #reset time
-
-                    #flip the frame horizontally
-                    if (self.isMirror):
-                        frame = cv2.flip(frame, HORIZONTAL)
                     if ret:
                         self.signal.emit(frame)
 
