@@ -11,6 +11,7 @@ CAMERA_HEIGHT = 300
 CAMERA_ID = 0
 SCREEN_RATIO = CAMERA_HEIGHT/CAMERA_WIDTH
 
+
 #calculate from frame.shape width multiply by 3
 BYTES_PER_LINE = 1272
 
