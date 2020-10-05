@@ -11,7 +11,6 @@ CAMERA_HEIGHT = 300
 CAMERA_ID = 0
 SCREEN_RATIO = CAMERA_HEIGHT/CAMERA_WIDTH
 
-#update
 #calculate from frame.shape width multiply by 3
 BYTES_PER_LINE = 1272
 
@@ -25,7 +24,7 @@ def update(frame):
     newWidth = width * scaleX
     newHeight = (SCREEN_RATIO) * newWidth
     scaledFrame = coloredFrame.scaled(newWidth, newHeight, Qt.KeepAspectRatio)
-    window.videoOutput.setFixedHeight(newHeight)
+    window.resize(newWidth, newHeight)
     window.videoOutput.setPixmap(scaledFrame)
 
 def quitApp():
