@@ -1,3 +1,9 @@
+import speech_recognition as sr
+import os
+import re
+from subprocess import Popen
+from pocketsphinx import LiveSpeech, get_model_path
+
 import cv2
 import numpy
 import time
@@ -5,6 +11,7 @@ from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.preprocessing import image
+
 
 #files
 faceDetectionModelFile = "haarcascade_frontalface_default.xml"
@@ -33,12 +40,23 @@ emotionLabels = {
     6: 'neutral'
 }
 
+#speech dictionary and language model paths
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+# DIC_PATH = DIR_PATH + "/dic/2714.dic"
+DIC_PATH = DIR_PATH + "/model/en-us/cmudict-en-us.dict"
+# LM_PATH = DIR_PATH + "/lm/2714.lm"
+LM_PATH = DIR_PATH + "/model/en-us/en-us.lm.bin"
+MODEL_PATH = DIR_PATH + "/model/en-us"
+TEMP_PATH = DIR_PATH + "/temp/output.log"
+launchSphinx = "pocketsphinx_continuous " + "-inmic yes " + "-dict " + DIC_PATH + " -lm " + LM_PATH + " -hmm " + MODEL_PATH + " -logfn " + TEMP_PATH + " -backtrace yes"
+
+
+
 class Camera():
     def __init__(self, cameraNumber, width, height):
         self.cameraNumber = cameraNumber
         self.width = width
         self.height = height
-        self.isMirror = False
 
         #webcam
         self._video = cv2.VideoCapture(cameraNumber)
@@ -49,6 +67,57 @@ class Camera():
     def frame(self):
         return self._video.read()
 
+class MicrophoneThread(QThread):
+    signal = pyqtSignal(int)
+
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+        self.fillerCount = 0
+
+    def check(self, input):
+        output = ''
+        a='((?:[a-z][a-z]+))'
+        b='.*?'
+        c='((?:[a-z][a-z]+))'
+        d='.*?'
+        e='((?:[a-z][a-z]+))'
+
+        regex = re.compile(a+b+c+d+e, re.IGNORECASE|re.DOTALL)
+        match = regex.search(input)
+        if (match):
+            if match.group(1) == 'INFO' and match.group(2) == 'pocketsphinx':
+                output = match.group(3)
+                print(output)
+                self.fillerCount = self.fillerCount + 1
+                self.signal.emit(self.fillerCount)
+            else:
+                output = 'n/a'
+        else:
+            output='n/a'
+        return str(output)
+
+    def run(self):
+        print('microphone running')
+
+        proc = Popen("gnome-terminal -e '" + launchSphinx + "'", shell = True)
+        time.sleep(5)
+        idx = 0
+        flag = 0
+
+        while True:
+            with open(TEMP_PATH) as f:
+                for i, line in enumerate(f):
+                    if line.startswith("INFO: pocketsphinx.c") and (i>idx):
+                        cmd = self.check(line)
+                        print(cmd)
+                idx = i
+                if flag == 1:
+                    break
+            if flag == 1:
+                break
+        proc.terminate()
+        proc.kill()
 
 class VideoThread(QThread):
     signal = pyqtSignal(numpy.ndarray)
@@ -56,7 +125,6 @@ class VideoThread(QThread):
     def __init__(self, camera, window):
         super().__init__()
         self.camera = camera
-        self.isMirror = False
         self.window = window
         self.frame_nums = FRAMES_MAX
 
@@ -71,10 +139,6 @@ class VideoThread(QThread):
                 return
             else:
                 ret, frame = self.camera.frame
-
-                #flip the frame horizontally
-                if (self.isMirror):
-                    frame = cv2.flip(frame, HORIZONTAL)
 
                 #turn image to gray scale
                 grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -114,6 +178,3 @@ class VideoThread(QThread):
                         start = time.time() #reset time
                     if ret:
                         self.signal.emit(frame)
-
-    def mirror(self):
-        self.isMirror = False if self.isMirror else True

@@ -1,0 +1,65 @@
+Language model created by QuickLM on Sun Nov 15 00:06:16 EST 2020
+Copyright (c) 1996-2010 Carnegie Mellon University and Alexander I. Rudnicky
+
+The model is in standard ARPA format, designed by Doug Paul while he was at MITRE.
+
+The code that was used to produce this language model is available in Open Source.
+Please visit http://www.speech.cs.cmu.edu/tools/ for more information
+
+The (fixed) discount mass is 0.5. The backoffs are computed using the ratio method.
+This model based on a corpus of 10 sentences and 12 words
+
+\data\
+ngram 1=12
+ngram 2=20
+ngram 3=10
+
+\1-grams:
+-0.7782 </s> -0.3010
+-0.7782 <s> -0.2218
+-1.7782 AH -0.2218
+-1.7782 AHH -0.2218
+-1.7782 AHHH -0.2218
+-1.7782 HM -0.2218
+-1.7782 HMM -0.2218
+-1.7782 UH -0.2218
+-1.7782 UHH -0.2218
+-1.7782 UM -0.2218
+-1.7782 UMM -0.2218
+-1.7782 UMMM -0.2218
+
+\2-grams:
+-1.3010 <s> AH 0.0000
+-1.3010 <s> AHH 0.0000
+-1.3010 <s> AHHH 0.0000
+-1.3010 <s> HM 0.0000
+-1.3010 <s> HMM 0.0000
+-1.3010 <s> UH 0.0000
+-1.3010 <s> UHH 0.0000
+-1.3010 <s> UM 0.0000
+-1.3010 <s> UMM 0.0000
+-1.3010 <s> UMMM 0.0000
+-0.3010 AH </s> -0.3010
+-0.3010 AHH </s> -0.3010
+-0.3010 AHHH </s> -0.3010
+-0.3010 HM </s> -0.3010
+-0.3010 HMM </s> -0.3010
+-0.3010 UH </s> -0.3010
+-0.3010 UHH </s> -0.3010
+-0.3010 UM </s> -0.3010
+-0.3010 UMM </s> -0.3010
+-0.3010 UMMM </s> -0.3010
+
+\3-grams:
+-0.3010 <s> AH </s>
+-0.3010 <s> AHH </s>
+-0.3010 <s> AHHH </s>
+-0.3010 <s> HM </s>
+-0.3010 <s> HMM </s>
+-0.3010 <s> UH </s>
+-0.3010 <s> UHH </s>
+-0.3010 <s> UM </s>
+-0.3010 <s> UMM </s>
+-0.3010 <s> UMMM </s>
+
+\end\
