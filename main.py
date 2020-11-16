@@ -1,60 +1,58 @@
-import speech_recognition as sr
-import os
-import re
-from subprocess import Popen
-from pocketsphinx import LiveSpeech, get_model_path
-
 import sys
 import numpy
 import cv2
 import time
+import pyaudio
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 from PyQt5 import QtGui, uic, QtWidgets
 from models import VideoThread, Camera, MicrophoneThread
+from speech_timer import TimerThread
+from threading import Thread
+from speech_to_text import MyRecognizeCallback
+from ibm_watson import SpeechToTextV1
+from ibm_watson.websocket import RecognizeCallback, AudioSource
+from threading import Thread
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from translate import Translator
+
+try:
+    from Queue import Queue, Full
+except ImportError:
+    from queue import Queue, Full
+
 
 CAMERA_WIDTH = 420
 CAMERA_HEIGHT = 300
 CAMERA_ID = 0
 SCREEN_RATIO = CAMERA_HEIGHT/CAMERA_WIDTH
+DEFAULT_DURATION = 180
+DEFAULT_THRESHOLD = 0
 
 #calculate from frame.shape width multiply by 3
 BYTES_PER_LINE = 1272
 
-#speech recognition
-recognizer = sr.Recognizer()
-microphone = sr.Microphone()
+# initialize speech to text service
+API_KEY = 'd_vI7npJhICly_5HOdyLYJYVlXU0QnCQOiSxjNil6qdl'
+API_URL = 'https://api.us-south.speech-to-text.watson.cloud.ibm.com/instances/eb505cb9-2feb-484c-ba93-7af0539d6dd7'
+authenticator = IAMAuthenticator(API_KEY)
+speech_to_text = SpeechToTextV1(authenticator=authenticator)
 
-model_path = get_model_path()
+#initalize queue to store the recordings ##
+CHUNK = 1024
+#Note: It will discard if the websocket client can't consumme fast enough
+#So, increase the max size as per your choice
+BUF_MAX_SIZE = CHUNK * 10
+#buffer to store audio
+q = Queue(maxsize=int(round(BUF_MAX_SIZE / CHUNK)))
 
-#speech dictionary and language model paths
-DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-DIC_PATH = DIR_PATH + "/dic/2714.dic"
-LM_PATH = DIR_PATH + "/lm/2714.lm"
-MODEL_PATH = DIR_PATH + "/model/en-us"
-TEMP_PATH = DIR_PATH + "/temp/output.log"
-launchSphinx = "pocketsphinx_continuous " + "-inmic yes " + "-dict " + DIC_PATH + " -lm " + LM_PATH + " -hmm " + MODEL_PATH + " -logfn " + TEMP_PATH + " -backtrace yes"
+#create an instance of AudioSource
+audio_source = AudioSource(q, True, True)
 
+disfluencyCount = 0
 
-# proc = Popen("gnome-terminal -e '" + launchSphinx + "'", shell = True)
-# time.sleep(5)
-# idx = 0
-# flag = 0
+#translator
+translator = Translator(to_lang="spanish")
 
-# while True:
-#     with open(TEMP_PATH) as f:
-#         for i, line in enumerate(f):
-#             if line.startswith("INFO: pocketsphinx.c") and (i>idx):
-#                 cmd = check(line, window)
-#                 print(cmd)
-#         idx = i
-#         if flag == 1:
-#             break
-#     if flag == 1:
-#         break
-# proc.terminate()
-# proc.kill()
-
-fillerCount = 0
 
 def update(frame):
     height, width, channel = frame.shape
@@ -69,32 +67,88 @@ def update(frame):
     window.resize(newWidth, newHeight)
     window.videoOutput.setPixmap(scaledFrame)
 
-def updateFillerWordsCount(c):
-    window.fillerWordsCountLabel.setText(str(c))
+def stopTimer():
+    timer_thread.pause()
 
-def record_audio():
-    with microphone as source:
-        audio = recognizer.listen(source)
-        print('Sphinx thinks you said ' + recognizer.recognize_sphinx(audio))
-
-def countdown(t):
-    while (t):
-        mins, secs = divmod(t, 60)
-        timer = '{:02d}:{:02d}'.format(mins, secs)
-        print(imer, end='\r')
-        t -= 1
-
+def startTimer():
+    duration = window.durationLineEdit.text()
+    threshold = window.thresholdLineEdit.text()
+    timer_thread.setThreshold(int(threshold))
+    timer_thread.resume(int(duration))
+    
 def quitApp():
     print('quit app')
     videoThread.requestInterruption()
     videoThread.wait()
     app.quit()
 
+def report():
+    print('final report: ' + disfluencyCount)
+
+#Variables for recording the speech
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+
+#define callback for pyaudio to store the recording in queue
+def pyaudio_callback(in_data, frame_count, time_info, status):
+    try:
+        q.put(in_data)
+    except Full:
+        pass # discard
+    return (None, pyaudio.paContinue)
+
+audio = pyaudio.PyAudio()
+stream = audio.open(
+    format=FORMAT,
+    channels=CHANNELS,
+    rate=RATE,
+    input=True,
+    frames_per_buffer=CHUNK,
+    stream_callback=pyaudio_callback,
+    start=False
+)
+
+print("Enter CTRL+C to end recording...")
+stream.start_stream()
+
+class Store:
+    def __init__(self, window):
+        self._window = window
+
+    def getSpeech(self, data):
+        self._window.captureTextLabel.setText(data)
+        global disfluencyCount
+        print(data)
+
+        #translate to spanish
+        translated_text = translator.translate(data)
+        self._window.translatedTextLabel.setText(translated_text)
+        if "%HESITATION" in data or "mmhm" in data:
+            disfluencyCount = disfluencyCount + 1
+            print(disfluencyCount)
+            self._window.disfluencyCountLabel.setText(str(disfluencyCount))
+
+
 #app
 app = QtWidgets.QApplication([])
 window = uic.loadUi("main.ui")
 window.setWindowTitle("Final Project")
 window.show()
+
+def recognize_using_websocket(*args):
+    mycallback = MyRecognizeCallback()
+    store = Store(window)
+    mycallback.subscribe(store.getSpeech)
+    speech_to_text.recognize_using_websocket(audio=audio_source,
+                                            content_type='audio/l16; rate=44100',
+                                            recognize_callback=mycallback,
+                                            interim_results=True)
+
+#timer
+timer_thread = TimerThread(window)
+timer_thread.start()
+timer_thread.pause()
 
 #webcam
 camera = Camera(CAMERA_ID, CAMERA_WIDTH, CAMERA_HEIGHT)
@@ -105,23 +159,21 @@ videoThread.signal.connect(update)
 videoThread.start()
 
 #microphone thread
-microphoneThread = MicrophoneThread(window)
-microphoneThread.signal.connect(updateFillerWordsCount)
-microphoneThread.start()
+recognize_thread = Thread(target=recognize_using_websocket, args=())
+recognize_thread.start()
+window.captureTextLabel.setText("Captured text...")
+window.translatedTextLabel.setText("Translated text...")
+window.disfluencyCountLabel.setText("0")
 
-#record speech
-print('say something')
-# record_audio()
-# time.sleep(1)
-# print('Start talking')
-# while 1:
-#     voiceData = record_audio()
-#     print(voiceData)
-# voiceData = record_audio()
-# print(voiceData)
+#timer thread
+window.recordButton.clicked.connect(startTimer)
+window.stopButton.clicked.connect(stopTimer)
 
 #event handler
 window.closeButton.clicked.connect(quitApp)
+
+#report
+window.reportButton.clicked.connect(report)
 
 #end
 sys.exit(app.exec_())

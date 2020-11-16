@@ -12,6 +12,8 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.preprocessing import image
 
+#microphone 
+r = sr.Recognizer()
 
 #files
 faceDetectionModelFile = "haarcascade_frontalface_default.xml"
@@ -50,8 +52,6 @@ MODEL_PATH = DIR_PATH + "/model/en-us"
 TEMP_PATH = DIR_PATH + "/temp/output.log"
 launchSphinx = "pocketsphinx_continuous " + "-inmic yes " + "-dict " + DIC_PATH + " -lm " + LM_PATH + " -hmm " + MODEL_PATH + " -logfn " + TEMP_PATH + " -backtrace yes"
 
-
-
 class Camera():
     def __init__(self, cameraNumber, width, height):
         self.cameraNumber = cameraNumber
@@ -69,55 +69,66 @@ class Camera():
 
 class MicrophoneThread(QThread):
     signal = pyqtSignal(int)
+    signal2 = pyqtSignal(str)
 
     def __init__(self, window):
         super().__init__()
         self.window = window
         self.fillerCount = 0
 
-    def check(self, input):
-        output = ''
-        a='((?:[a-z][a-z]+))'
-        b='.*?'
-        c='((?:[a-z][a-z]+))'
-        d='.*?'
-        e='((?:[a-z][a-z]+))'
+    # def check(self, input):
+    #     output = ''
+    #     a='((?:[a-z][a-z]+))'
+    #     b='.*?'
+    #     c='((?:[a-z][a-z]+))'
+    #     d='.*?'
+    #     e='((?:[a-z][a-z]+))'
 
-        regex = re.compile(a+b+c+d+e, re.IGNORECASE|re.DOTALL)
-        match = regex.search(input)
-        if (match):
-            if match.group(1) == 'INFO' and match.group(2) == 'pocketsphinx':
-                output = match.group(3)
-                print(output)
-                self.fillerCount = self.fillerCount + 1
-                self.signal.emit(self.fillerCount)
-            else:
-                output = 'n/a'
-        else:
-            output='n/a'
-        return str(output)
+    #     regex = re.compile(a+b+c+d+e, re.IGNORECASE|re.DOTALL)
+    #     match = regex.search(input)
+    #     if (match):
+    #         if match.group(1) == 'INFO' and match.group(2) == 'pocketsphinx':
+    #             output = match.group(3)
+    #             # self.fillerCount = self.fillerCount + 1
+    #             # self.signal.emit(self.fillerCount)
+    #         else:
+    #             output = 'n/a'
+    #     else:
+    #         output='n/a'
+    #     return str(output)
 
     def run(self):
         print('microphone running')
 
-        proc = Popen("gnome-terminal -e '" + launchSphinx + "'", shell = True)
-        time.sleep(5)
-        idx = 0
-        flag = 0
-
         while True:
-            with open(TEMP_PATH) as f:
-                for i, line in enumerate(f):
-                    if line.startswith("INFO: pocketsphinx.c") and (i>idx):
-                        cmd = self.check(line)
-                        print(cmd)
-                idx = i
-                if flag == 1:
-                    break
-            if flag == 1:
-                break
-        proc.terminate()
-        proc.kill()
+            with sr.Microphone() as source:
+                r.adjust_for_ambient_noise(source)
+                print('say something')
+                audio = r.listen(source)
+
+                
+                output = r.recognize_sphinx(audio)
+                print(output)
+
+        # proc = Popen("gnome-terminal -e '" + launchSphinx + "'", shell = True)
+        # time.sleep(1)
+        # idx = 0
+        # flag = 0
+
+        # while True:
+        #     with open(TEMP_PATH) as f:
+        #         for i, line in enumerate(f):
+        #             if line.startswith("INFO: pocketsphinx.c") and (i>idx):
+        #                 self.signal2.emit(line)
+        #                 cmd = self.check(line)
+        #                 print('cmd: ' + cmd)
+        #         idx = i
+        #         if flag == 1:
+        #             break
+        #     if flag == 1:
+        #         break
+        # proc.terminate()
+        # proc.kill()
 
 class VideoThread(QThread):
     signal = pyqtSignal(numpy.ndarray)
@@ -129,10 +140,8 @@ class VideoThread(QThread):
         self.frame_nums = FRAMES_MAX
 
     def run(self):
-        print('thread running')
         frameCount = 0
         start = time.time()
-
         while True:
             if self.isInterruptionRequested():
                 self.camera._video.release()
@@ -173,7 +182,6 @@ class VideoThread(QThread):
                         fps = self.frame_nums / seconds
                         fps = round(fps)
                         self.window.fps.setText("FPS: {}".format(fps))
-                        print("fps: {}".format(fps))
                         frameCount = 0 #reset frame count
                         start = time.time() #reset time
                     if ret:
