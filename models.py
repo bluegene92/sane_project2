@@ -42,16 +42,6 @@ emotionLabels = {
     6: 'neutral'
 }
 
-#speech dictionary and language model paths
-DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-# DIC_PATH = DIR_PATH + "/dic/2714.dic"
-DIC_PATH = DIR_PATH + "/model/en-us/cmudict-en-us.dict"
-# LM_PATH = DIR_PATH + "/lm/2714.lm"
-LM_PATH = DIR_PATH + "/model/en-us/en-us.lm.bin"
-MODEL_PATH = DIR_PATH + "/model/en-us"
-TEMP_PATH = DIR_PATH + "/temp/output.log"
-launchSphinx = "pocketsphinx_continuous " + "-inmic yes " + "-dict " + DIC_PATH + " -lm " + LM_PATH + " -hmm " + MODEL_PATH + " -logfn " + TEMP_PATH + " -backtrace yes"
-
 class Camera():
     def __init__(self, cameraNumber, width, height):
         self.cameraNumber = cameraNumber
@@ -67,71 +57,9 @@ class Camera():
     def frame(self):
         return self._video.read()
 
-class MicrophoneThread(QThread):
-    signal = pyqtSignal(int)
-    signal2 = pyqtSignal(str)
-
-    def __init__(self, window):
-        super().__init__()
-        self.window = window
-        self.fillerCount = 0
-
-    # def check(self, input):
-    #     output = ''
-    #     a='((?:[a-z][a-z]+))'
-    #     b='.*?'
-    #     c='((?:[a-z][a-z]+))'
-    #     d='.*?'
-    #     e='((?:[a-z][a-z]+))'
-
-    #     regex = re.compile(a+b+c+d+e, re.IGNORECASE|re.DOTALL)
-    #     match = regex.search(input)
-    #     if (match):
-    #         if match.group(1) == 'INFO' and match.group(2) == 'pocketsphinx':
-    #             output = match.group(3)
-    #             # self.fillerCount = self.fillerCount + 1
-    #             # self.signal.emit(self.fillerCount)
-    #         else:
-    #             output = 'n/a'
-    #     else:
-    #         output='n/a'
-    #     return str(output)
-
-    def run(self):
-        print('microphone running')
-
-        while True:
-            with sr.Microphone() as source:
-                r.adjust_for_ambient_noise(source)
-                print('say something')
-                audio = r.listen(source)
-
-                
-                output = r.recognize_sphinx(audio)
-                print(output)
-
-        # proc = Popen("gnome-terminal -e '" + launchSphinx + "'", shell = True)
-        # time.sleep(1)
-        # idx = 0
-        # flag = 0
-
-        # while True:
-        #     with open(TEMP_PATH) as f:
-        #         for i, line in enumerate(f):
-        #             if line.startswith("INFO: pocketsphinx.c") and (i>idx):
-        #                 self.signal2.emit(line)
-        #                 cmd = self.check(line)
-        #                 print('cmd: ' + cmd)
-        #         idx = i
-        #         if flag == 1:
-        #             break
-        #     if flag == 1:
-        #         break
-        # proc.terminate()
-        # proc.kill()
-
 class VideoThread(QThread):
     signal = pyqtSignal(numpy.ndarray)
+    signalMood = pyqtSignal(str)
 
     def __init__(self, camera, window):
         super().__init__()
@@ -170,6 +98,9 @@ class VideoThread(QThread):
                     probability = numpy.max(predictions)
                     probability = str(round(probability, 2))
                     moodText = "{} ({})".format(emotionLabels[moodIndex], probability)
+
+                    self.signalMood.emit(moodText)
+
 
                     #write emotion prediction on screen
                     cv2.putText(frame, moodText, (x, (y+h+yOffset)), cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE, RED)

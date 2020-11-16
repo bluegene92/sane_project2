@@ -28,10 +28,13 @@ class TimerThread(threading.Thread):
             #if countdown less than thresold change label color to red
             if (self._countdown <= self._threshold):
                 self._window.countdownLabel.setStyleSheet("color: red")
+            elif self._countdown > self._threshold:
+                self._window.countdownLabel.setStyleSheet("color: black")
 
             if (self._countdown <= 0):
                 self.pause()
                 self._window.countdownLabel.setStyleSheet("color: black")
+
 
             self._window.countdownLabel.setText(timeformat)
 
